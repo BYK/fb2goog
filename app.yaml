@@ -7,6 +7,9 @@ handlers:
 - url: /
   script: home.py
 
+- url: /upload
+  script: home.py
+
 - url: /index\.html
   script: home.py
   
