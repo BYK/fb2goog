@@ -1,55 +1,17 @@
-<!doctype html>
-<html>
-	<head>
-		<meta http-equiv="content-type" content="text/html; charset=UTF-8">
-		<title>{% block title %}{% endblock %}Facebook to Google</title>
-		<link rel="shortcut icon" href="favicon.ico" type="image/ico">
-		<!--[if lt IE 9]>
-		<script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
-		<![endif]-->
-		<link rel="stylesheet" href="css/screen.css" type="text/css" media="screen">
-		<link rel="stylesheet" href="css/print.css" type="text/css" media="print">
-	</head>
-	<body>
-		<header>
-			<div id="user">
-				{% if is_logged %}
-				<strong>{{ user }}</strong> - <a href="{{ url }}" title="Sign out">Sign out</a>
-				{% else %}
-				<a href="{{ url }}" id="goog-login-button" title="Sign in with Google Accounts">Sign in with Google Accounts</a>
-				{% endif %}
-			</div>
-			<h1>fb2goog</h1>
-		</header>
-		<div id="content">
-			{% block content %}
-			<h2>Why fb2google?</h2>
-			<p>
-				Short description.
-			</p>
-			<ul>
-				<li>
-					Google Picasa
-				</li>
-				<li>
-					Google Contacts
-				</li>
-			</ul>
-			{% endblock %}
-		</div>
-		{% block footer %}
-		<footer>
-			<p>
-				Berker Peksag (@berkerpeksag), Burak Yigit Kaya (@madbyk)
-		</footer>
-		{% endblock %}
+{% extends "base.html" %}
 
-		<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js">
-		</script>
-		<script type="text/javascript">
-			$(function() {
+{% block content %}
+<h2>Why fb2google?</h2>
+<p>
+	Short description.
+</p>
 
-			});
-		</script>
-	</body>
-</html>
+<ul>
+	<li>
+		Google Picasa
+	</li>
+	<li>
+		Google Contacts
+	</li>
+</ul>
+{% endblock %}

@@ -13,46 +13,41 @@ from StringIO import StringIO
 
 sys.setrecursionlimit(10000) # SDK fix
 
-class MainPage(webapp.RequestHandler):
+
+class Page(webapp.RequestHandler):
+	def __init__(self):
+		self.user = users.get_current_user()
+
+		if self.user:
+			self.url = users.create_logout_url('/')
+			self.is_logged = True
+		else:
+			self.url = users.create_login_url('/')
+			self.is_logged = False
+
+		self.values = {
+			'user': self.user,
+			'url': self.url,
+			'is_logged': self.is_logged,
+		}		
+
+
+class MainPage(Page):
 	def get(self):
 		self.response.headers['Content-Type'] = 'text/html'
 
-		user = users.get_current_user()
-
-		if user:
-			url = users.create_logout_url(self.request.uri)
-			is_logged = True
-		else:
-			url = users.create_login_url(self.request.uri)
-			is_logged = False
-
-		values = {
-			'user': user,
-			'url': url,
-			'is_logged': is_logged,
-		}
-
 		path = os.path.join(os.path.dirname(__file__), 'templates/index.html')
-		self.response.out.write(template.render(path, values))
+		self.response.out.write(template.render(path, self.values))
 
-	def put(self):
-		pass
 
-class UploadPage(webapp.RequestHandler):
+class UploadPage(Page):
 	def get(self):
-		user = users.get_current_user()
-
-		if user:
-			url = users.create_logout_url(self.request.uri)
-			self.response.headers['Content-Type'] = 'text/html'
+		self.response.headers['Content-Type'] = 'text/html'
+			
+		if self.user:
 			path = os.path.join(os.path.dirname(__file__), 'templates/upload.html')
 
-			values = {
-				'user': user,
-				'url': url
-			}
-
-			self.response.out.write(template.render(path, values))
+			self.response.out.write(template.render(path, self.values))
 		else:
 			self.redirect('/')
 
@@ -68,10 +63,11 @@ class UploadPage(webapp.RequestHandler):
 		else:
 			self.response.out.write('No file')
 
+
 application = webapp.WSGIApplication(
 	[
 		('/', MainPage),
-		('/upload', UploadPage)
+		('/upload', UploadPage),
 	],
 	debug = True
 )
