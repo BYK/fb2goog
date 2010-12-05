@@ -11,6 +11,8 @@ import sys
 import zipfile
 from StringIO import StringIO
 
+import models
+
 sys.setrecursionlimit(10000) # SDK fix
 
 
