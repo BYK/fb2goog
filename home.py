@@ -29,15 +29,27 @@ class Page(webapp.RequestHandler):
 			'user': self.user,
 			'url': self.url,
 			'is_logged': self.is_logged,
-		}		
+		}
+
+
+	def render(self, file, values=None):
+		self.response.headers['Content-Type'] = 'text/html'
+
+		path = os.path.join(os.path.dirname(__file__), 'templates/%s' % file)
+
+		self.response.out.write(template.render(path, values if values else self.values))
+
 
 
 class MainPage(Page):
 	def get(self):
 		self.response.headers['Content-Type'] = 'text/html'
 
-		path = os.path.join(os.path.dirname(__file__), 'templates/index.html')
-		self.response.out.write(template.render(path, self.values))
+		if self.is_logged:
+			self.render('upload.html')
+		else:
+			self.render('index.html')
+
 
 
 class UploadPage(Page):
@@ -45,11 +57,10 @@ class UploadPage(Page):
 		self.response.headers['Content-Type'] = 'text/html'
 			
 		if self.user:
-			path = os.path.join(os.path.dirname(__file__), 'templates/upload.html')
-
-			self.response.out.write(template.render(path, self.values))
+			self.render('upload.html')
 		else:
 			self.redirect('/')
+
 
 	def post(self):
 		upFile = self.request.get("fbContents")
@@ -62,6 +73,7 @@ class UploadPage(Page):
 			upFileF.close()
 		else:
 			self.response.out.write('No file')
+
 
 
 application = webapp.WSGIApplication(
