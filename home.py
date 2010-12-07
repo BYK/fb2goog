@@ -56,7 +56,7 @@ class Page(webapp.RequestHandler):
 	def render(self, file, values = None):
 		self.response.headers['Content-Type'] = 'text/html'
 
-		path = os.path.join(os.path.dirname(__file__), 'templates/%s' % file)
+		path = os.path.join(os.path.dirname(__file__), 'templates/%s.html' % file)
 		self.response.out.write(template.render(path, values if values else self.values))
 
 
@@ -68,9 +68,9 @@ class MainPage(Page):
 				album.numphotos.text, album.gphoto_id.text))"""
 
 		if self.is_logged:
-			self.render('upload.html')
+			self.render('upload')
 		else:
-			self.render('index.html')
+			self.render('index')
 
 
 class ServicesPage(Page):
@@ -83,7 +83,7 @@ class ServicesPage(Page):
 				'purpose': self.services[service]['purpose']
 			})
 
-		self.render('services.html', values)
+		self.render('services', values)
 
 
 	def post(self):
@@ -135,7 +135,7 @@ class UploadPage(Page):
 	def get(self):
 		#TODO: Check if the user is logged in and has authenticated the App for at least one service
 		#if self.user:
-		self.render('upload.html')
+		self.render('upload')
 		#else:
 		#	self.redirect('/')
 
