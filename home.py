@@ -1,21 +1,30 @@
 # coding: utf-8
 
+import os
+import re
+import sys
+import zipfil
+
+from StringIO import StringIO
+
+import gdata.alt.appengine
+import gdata.calendar.service
+import gdata.docs.client
+import gdata.photos.service
+import gdata.service
+
+from google.appengine.api import users
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp.util import run_wsgi_app
 from google.appengine.ext.webapp import template
-from google.appengine.api import users
 
-import gdata.service
-import gdata.alt.appengine
-import gdata.photos.service
-import gdata.calendar.service
-import gdata.docs.client
+import models
 
-from StringIO import StringIO
 from helpers import html_unescape
-import os, sys, zipfile, re, models
+
 
 sys.setrecursionlimit(10000) # SDK fix
+
 
 class Page(webapp.RequestHandler):
 	services = {
