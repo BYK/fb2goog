@@ -12,15 +12,11 @@ import gdata.photos.service
 import gdata.calendar.service
 import gdata.docs.client
 
-import os
-import sys
-import zipfile
 from StringIO import StringIO
-
-import models
+from helpers import html_unescape
+import os, sys, zipfile, re, models
 
 sys.setrecursionlimit(10000) # SDK fix
-
 
 class Page(webapp.RequestHandler):
 	services = {
@@ -54,7 +50,7 @@ class Page(webapp.RequestHandler):
 		self.values = {
 			'user': self.user,
 			'url': self.url,
-			'is_logged': self.is_logged,
+			'is_logged': self.is_logged
 		}
 
 	def render(self, file, values = None):
@@ -92,7 +88,11 @@ class ServicesPage(Page):
 
 	def post(self):
 		selected_services = self.request.POST.getall('services')
-		user_info = models.User()
+
+		user_info = models.User.gql('WHERE name=:1', self.user).get()
+		if not user_info:
+			user_info = models.User()
+
 		gdata_client = gdata.service.GDataService()
 		gdata.alt.appengine.run_on_appengine(gdata_client)
 
@@ -133,6 +133,7 @@ class TokenPage(Page):
 
 class UploadPage(Page):
 	def get(self):
+		#TODO: Check if the user is logged in and has authenticated the App for at least one service
 		#if self.user:
 		self.render('upload.html')
 		#else:
@@ -143,17 +144,34 @@ class UploadPage(Page):
 		if archive:
 			archive_file = StringIO(archive)
 			archive_reader = zipfile.ZipFile(archive_file, 'r')
+			archive_files = archive_reader.namelist()
 
-			for name in archive_reader.namelist():
-				self.response.out.write("Opening %s...<br>" % name)
+			#TODO: Do not activate photo import if the user did not selected Picasa from services
+			photos_page_name = filter(lambda x: x.endswith('photos.html'), archive_files)[0]
+			photos_page = archive_reader.read(photos_page_name)
 
-				file_content = StringIO(archive_reader.read(name))
+			#MatchResult -> (album_page_path, cover_image, album_name, photo_count, album_date)
+			album_parser = re.compile(r'<div class="album">\s+<a href="([^<>"]+)"><img .+ src="([^<>"]+)"/></a>\s+<br/>\s+<a href="\1">([^<>"]+)</a>\s+- (\d+) photos\s+<br/>\s*<span class="time">([^<>"]+)</span>\s+</div>')
+			albums = map(lambda album: map(html_unescape, album), album_parser.findall(photos_page))
 
-				album_url = '/data/feed/api/user/%s/albumid/%s' % (self.user, self.aid)
+			photos_client = self.services['Picasa']['client'](email = self.user.email()) #email should be given or InsertAlbum fails
+			gdata.alt.appengine.run_on_appengine(photos_client)
 
-				photo = self.client.InsertPhotoSimple(
-					'/data/feed/api/user/default/albumid/default', 'New Photo',
-					'Uploaded using FB2Google', file_content, content_type = 'image/jpeg')
+			#TODO: Should check if an album with the same name exists and ask wheter to replace it, add into it or create a new one
+			#user_albums = photos_client.GetUserFeed(user = self.user).entry
+			#for album in user_albums:
+			#	self.response.out.write('title: %s, number of photos: %s, id: %s' % (album.title.text, album.numphotos.text, album.gphoto_id))
+
+			for album in albums:
+				picasa_album = photos_client.InsertAlbum(title = album[2], summary = 'Imported from Facebook, original creation date: %s' % album[4], access = "private")
+				#TODO: Parse the album page and retrieve the necessary images with maximum information possible from the page.
+
+				#self.response.out.write("Opening %s...<br>" % name)
+				#file_content = StringIO(archive_reader.read(name))
+				#album_url = '/data/feed/api/user/%s/albumid/%s' % (self.user, self.aid)
+				#photo = self.client.InsertPhotoSimple(
+				#	'/data/feed/api/user/default/albumid/default', 'New Photo',
+				#	'Uploaded using FB2Google', file_content, content_type = 'image/jpeg')
 
 			archive_reader.close()
 			archive_file.close()
