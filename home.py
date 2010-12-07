@@ -61,7 +61,7 @@ class Page(webapp.RequestHandler):
 			'is_logged': self.is_logged
 		}
 
-	def check_user_service(self):
+	def check_user_services(self):
 		return models.User.gql('WHERE name = :1', self.user).get().services
 
 	def render(self, file, values = None):
