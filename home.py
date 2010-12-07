@@ -4,7 +4,6 @@ from google.appengine.ext import webapp
 from google.appengine.ext.webapp.util import run_wsgi_app
 from google.appengine.ext.webapp import template
 from google.appengine.api import users
-from google.appengine.ext import db
 
 import gdata.service
 import gdata.alt.appengine
@@ -53,6 +52,9 @@ class Page(webapp.RequestHandler):
 			'is_logged': self.is_logged
 		}
 
+	def check_user_service(self):
+		return models.User.gql('WHERE name = :1', self.user).get().services
+
 	def render(self, file, values = None):
 		self.response.headers['Content-Type'] = 'text/html'
 
@@ -62,11 +64,6 @@ class Page(webapp.RequestHandler):
 
 class MainPage(Page):
 	def get(self):
-		"""albums = self.client.GetUserFeed(user=self.user)
-		for album in albums.entry:
-			self.response.out.write('title: %s, number of photos: %s, id: %s' % (album.title.text,
-				album.numphotos.text, album.gphoto_id.text))"""
-
 		if self.is_logged:
 			self.render('upload')
 		else:
@@ -77,6 +74,7 @@ class ServicesPage(Page):
 	def get(self):
 		values = self.values.copy()
 		values['services'] = []
+
 		for service in self.services:
 			values['services'].append({
 				'name': service,
@@ -133,11 +131,10 @@ class TokenPage(Page):
 
 class UploadPage(Page):
 	def get(self):
-		#TODO: Check if the user is logged in and has authenticated the App for at least one service
-		#if self.user:
-		self.render('upload')
-		#else:
-		#	self.redirect('/')
+		if self.is_logged and self.check_user_services():
+			self.render('upload')
+		else:
+			self.redirect('/')
 
 	def post(self):
 		archive = self.request.get("fbContents")
