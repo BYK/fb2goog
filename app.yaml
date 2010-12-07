@@ -10,7 +10,10 @@ handlers:
 - url: /upload
   script: home.py
 
-- url: /welcome
+- url: /services
+  script: home.py
+
+- url: /token
   script: home.py
 
 - url: /index\.html

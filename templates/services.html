@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Available Services</h2>
+<form enctype="multipart/form-data" method="POST" action="/services">
+	<ul>
+	{% for service in services %}
+	<li>
+		<input type="checkbox" name="services" id="service_{{ service.name }}" value="{{ service.name }}" checked>
+		<label for="service_{{ service.name }}">{{ service.name }} ({{ service.purpose }})</label>
+	</li>
+	{% endfor %}
+	</ul>
+	<button type="submit">Enable</button>
+</form>
+{% endblock %}
