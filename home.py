@@ -3,7 +3,7 @@
 import os
 import re
 import sys
-import zipfil
+import zipfile
 
 from StringIO import StringIO
 
