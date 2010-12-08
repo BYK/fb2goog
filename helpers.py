@@ -1,11 +1,14 @@
 import urlparse
-import xml.dom.minidom as minidom
+import xml.dom.minidom as dom
 
 def check_album_container(c):
 	return c.getAttribute('class') == 'album'
 
 def check_photo_container(c):
 	return c.getAttribute('class') == 'photo'
+
+def check_comment_container(c):
+	return c.getAttribute('class') == 'comment'
 
 def extract_path(link, attribute_name = 'href'):
 	return urlparse.unquote(link.getAttribute(attribute_name).encode('utf-8'))
@@ -18,7 +21,7 @@ class FBAlbum(object):
 		self.cover_photo_path = extract_path(container.getElementsByTagName('img')[0], 'src')
 
 		for elem in container.childNodes:
-			if elem.nodeType != minidom.Node.TEXT_NODE and elem.tagName == 'span' and elem.getAttribute('class') == 'time':
+			if elem.nodeType != dom.Node.TEXT_NODE and elem.tagName == 'span' and elem.getAttribute('class') == 'time':
 				self.timestamp = elem.firstChild.nodeValue
 				break
 
@@ -36,15 +39,31 @@ class FBPhoto(object):
 			self.caption = ''
 
 		self.tags = []
-
 		for br in line_breaks:
 			if br.nextSibling.nodeValue and br.nextSibling.nodeValue.strip() == 'In this video:':
 				span_element = br.nextSibling.nextSibling
 				next_br = line_breaks[line_breaks.index(br) + 1]
 
 				while span_element != next_br:
-					if span_element.nodeType != minidom.Node.TEXT_NODE and span_element.tagName == 'span':
+					if span_element.nodeType != dom.Node.TEXT_NODE and span_element.tagName == 'span':
 						self.tags.append(span_element.firstChild.nodeValue)
 					span_element = span_element.nextSibling
 
 				break
+
+		self.comments = map(FBComment, filter(check_comment_container, container.getElementsByTagName('div')))
+
+
+class FBComment(object):
+	def __init__(self, container):
+		self.author = container.firstChild.firstChild.nodeValue
+		self.timestamp = container.lastChild.firstChild.nodeValue
+		self.message = ''
+		node = container.childNodes[1]
+		while node != container.lastChild:
+			if node.nodeType == dom.Node.TEXT_NODE:
+				self.message += node.nodeValue
+			elif node.nodeType == dom.Node.ELEMENT_NODE and node.tagName.lower() == 'br':
+				self.message += "\n"
+
+			node = node.nextSibling

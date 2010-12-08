@@ -178,7 +178,9 @@ class UploadPage(Page):
 				photos = map(FBPhoto, filter(check_photo_container, album_page.getElementsByTagName('div')))
 				for photo in photos:
 					photo.path = posixpath.normpath(photo_root_path + photo.path)
-					self.response.out.write('%s (%s) @ %s<br>Tags: %s<br>' % (photo.caption, photo.path, photo.timestamp, photo.tags))
+					self.response.out.write('%s (%s) @ %s<br>Tags: %s<br>' % (photo.caption, photo.path, photo.timestamp, ', '.join(photo.tags)))
+					for comment in photo.comments:
+						self.response.out.write('%s: %s @ %s<br>' % (comment.author, comment.message, comment.timestamp))
 					photo_content = archive_reader.read(photo.path)
 
 				self.response.out.write('<br>')
