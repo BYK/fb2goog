@@ -155,40 +155,40 @@ class UploadPage(Page):
 			archive_files = archive_reader.namelist()
 
 			#TODO: Do not activate photo import if the user did not selected Picasa from services
-			photos_client = self.services['Picasa']['client'](email = self.user.email()) #email should be given or InsertAlbum fails
-			gdata.alt.appengine.run_on_appengine(photos_client)
+			picasa_client = self.services['Picasa']['client'](email = self.user.email()) #email should be given or InsertAlbum fails
+			gdata.alt.appengine.run_on_appengine(picasa_client)
 
 			#TODO: Should check if an album with the same name exists and ask wheter to replace it, add into it or create a new one
-			#user_albums = photos_client.GetUserFeed(user = self.user).entry
+			#user_albums = picasa_client.GetUserFeed(user = self.user).entry
 			#for album in user_albums:
 			#	self.response.out.write('title: %s, number of photos: %s, id: %s' % (album.title.text, album.numphotos.text, album.gphoto_id))
 
 			photos_page_name = filter(lambda x: x.endswith('photos.html'), archive_files)[0]
-			album_root_path = posixpath.split(photos_page_name)[0] + '/'
+			album_root_path = posixpath.dirname(photos_page_name) + '/'
 			photos_page = minidom.parseString(archive_reader.read(photos_page_name).replace('<BR>', '<br/>'))
 
 			albums = map(FBAlbum, filter(check_album_container, photos_page.getElementsByTagName('div')))
 			for album in albums:
 				album.path = posixpath.normpath(album_root_path + urlparse.unquote(album.path))
-				self.response.out.write('%s (%s) @ %s<br>' % (album.title, album.path, album.timestamp))
-				#picasa_album = photos_client.InsertAlbum(title = album.title, summary = 'Imported from Facebook via FB2Google, original creation date: %s' % album.timestamp, access = "private")
+				self.response.out.write('%s (%s) @ %s<br>' % (album.title, album.path, album.datetime))
 
-				photo_root_path = posixpath.split(album.path)[0] + '/'
+				#TODO: Ask user album visibility preference
+				picasa_album = picasa_client.InsertAlbum(album.title, 'Imported from Facebook via FB2Google', access = "private", timestamp = album.timestamp)
+				picasa_album_url = '/data/feed/api/user/default/albumid/%s' % picasa_album.gphoto_id.text
+
+				photo_root_path = posixpath.dirname(album.path) + '/'
 				album_page = minidom.parseString(archive_reader.read(album.path).replace('<BR>', '<br/>'))
 				photos = map(FBPhoto, filter(check_photo_container, album_page.getElementsByTagName('div')))
 				for photo in photos:
 					photo.path = posixpath.normpath(photo_root_path + photo.path)
-					self.response.out.write('%s (%s) @ %s<br>Tags: %s<br>' % (photo.caption, photo.path, photo.timestamp, ', '.join(photo.tags)))
+					self.response.out.write('%s (%s) @ %s<br>Tags: %s<br>' % (photo.caption, photo.path, photo.datetime, ', '.join(photo.tags)))
 					for comment in photo.comments:
-						self.response.out.write('%s: %s @ %s<br>' % (comment.author, comment.message, comment.timestamp))
-					photo_content = archive_reader.read(photo.path)
+						self.response.out.write('%s: %s @ %s<br>' % (comment.author, comment.message, comment.datetime))
+
+					photo_content = StringIO(archive_reader.read(photo.path))
+					picasa_photo = picasa_client.InsertPhotoSimple(picasa_album_url, photo.caption, 'Imported from Facebook via FB2Google, original creation date: %s' % photo.datetime, photo_content, 'image/jpeg', photo.tags)
 
 				self.response.out.write('<br>')
-				#file_content = StringIO(archive_reader.read(name))
-				#album_url = '/data/feed/api/user/%s/albumid/%s' % (self.user, self.aid)
-				#photo = self.client.InsertPhotoSimple(
-				#	'/data/feed/api/user/default/albumid/default', 'New Photo',
-				#	'Uploaded using FB2Google', file_content, content_type = 'image/jpeg')
 
 			archive_reader.close()
 			archive_file.close()

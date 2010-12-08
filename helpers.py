@@ -1,4 +1,6 @@
+import time
 import urlparse
+import posixpath
 import xml.dom.minidom as dom
 
 def check_album_container(c):
@@ -13,6 +15,9 @@ def check_comment_container(c):
 def extract_path(link, attribute_name = 'href'):
 	return urlparse.unquote(link.getAttribute(attribute_name).encode('utf-8'))
 
+def FBdatetime2timestamp(dtime):
+	return str(int(time.mktime(time.strptime(dtime, "%B %d, %Y at %H:%M"))) * 1000)
+
 class FBAlbum(object):
 	def __init__(self, container):
 		links = container.getElementsByTagName('a')
@@ -22,7 +27,8 @@ class FBAlbum(object):
 
 		for elem in container.childNodes:
 			if elem.nodeType != dom.Node.TEXT_NODE and elem.tagName == 'span' and elem.getAttribute('class') == 'time':
-				self.timestamp = elem.firstChild.nodeValue
+				self.datetime = elem.firstChild.nodeValue
+				self.timestamp = FBdatetime2timestamp(self.datetime)
 				break
 
 
@@ -31,12 +37,16 @@ class FBPhoto(object):
 		#Each link -> [*empty*, photo_path, original_photo_path]
 		links = container.getElementsByTagName('a')
 		self.path = extract_path(links[1])
-		self.timestamp = links[2].getElementsByTagName('span')[0].firstChild.nodeValue
+		self.datetime = links[2].getElementsByTagName('span')[0].firstChild.nodeValue
+		self.timestamp = FBdatetime2timestamp(self.datetime)
 
 		line_breaks = container.getElementsByTagName('br')
 		self.caption = line_breaks[0].nextSibling.nodeValue.strip()
 		if self.caption == 'In this video:':
 			self.caption = ''
+
+		if self.caption == '':
+			self.caption = posixpath.splitext(posixpath.basename(self.path))[0]
 
 		self.tags = []
 		for br in line_breaks:
@@ -57,7 +67,8 @@ class FBPhoto(object):
 class FBComment(object):
 	def __init__(self, container):
 		self.author = container.firstChild.firstChild.nodeValue
-		self.timestamp = container.lastChild.firstChild.nodeValue
+		self.datetime = container.lastChild.firstChild.nodeValue
+		self.timestamp = self.timestamp = FBdatetime2timestamp(self.datetime)
 		self.message = ''
 		node = container.childNodes[1]
 		while node != container.lastChild:
