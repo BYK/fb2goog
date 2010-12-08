@@ -1,9 +1,11 @@
 # coding: utf-8
 
 import os
+import posixpath
 import re
 import sys
-import zipfil
+import xml.dom.minidom as minidom
+import zipfile
 
 from StringIO import StringIO
 
@@ -20,7 +22,7 @@ from google.appengine.ext.webapp import template
 
 import models
 
-from helpers import html_unescape
+from helpers import *
 
 
 sys.setrecursionlimit(10000) # SDK fix
@@ -67,7 +69,7 @@ class Page(webapp.RequestHandler):
 	def render(self, file, values = None):
 		self.response.headers['Content-Type'] = 'text/html'
 
-		path = os.path.join(os.path.dirname(__file__), 'templates/%s.html' % file)
+		path = posixpath.join(posixpath.dirname(__file__), 'templates/%s.html' % file)
 		self.response.out.write(template.render(path, values if values else self.values))
 
 
@@ -153,13 +155,6 @@ class UploadPage(Page):
 			archive_files = archive_reader.namelist()
 
 			#TODO: Do not activate photo import if the user did not selected Picasa from services
-			photos_page_name = filter(lambda x: x.endswith('photos.html'), archive_files)[0]
-			photos_page = archive_reader.read(photos_page_name)
-
-			#MatchResult -> (album_page_path, cover_image, album_name, photo_count, album_date)
-			album_parser = re.compile(r'<div class="album">\s+<a href="([^<>"]+)"><img .+ src="([^<>"]+)"/></a>\s+<br/>\s+<a href="\1">([^<>"]+)</a>\s+- (\d+) photos\s+<br/>\s*<span class="time">([^<>"]+)</span>\s+</div>')
-			albums = map(lambda album: map(html_unescape, album), album_parser.findall(photos_page))
-
 			photos_client = self.services['Picasa']['client'](email = self.user.email()) #email should be given or InsertAlbum fails
 			gdata.alt.appengine.run_on_appengine(photos_client)
 
@@ -168,11 +163,25 @@ class UploadPage(Page):
 			#for album in user_albums:
 			#	self.response.out.write('title: %s, number of photos: %s, id: %s' % (album.title.text, album.numphotos.text, album.gphoto_id))
 
-			for album in albums:
-				picasa_album = photos_client.InsertAlbum(title = album[2], summary = 'Imported from Facebook, original creation date: %s' % album[4], access = "private")
-				#TODO: Parse the album page and retrieve the necessary images with maximum information possible from the page.
+			photos_page_name = filter(lambda x: x.endswith('photos.html'), archive_files)[0]
+			album_root_path = posixpath.split(photos_page_name)[0] + '/'
+			photos_page = minidom.parseString(archive_reader.read(photos_page_name).replace('<BR>', '<br/>'))
 
-				#self.response.out.write("Opening %s...<br>" % name)
+			albums = map(FBAlbum, filter(check_album_container, photos_page.getElementsByTagName('div')))
+			for album in albums:
+				album.path = posixpath.normpath(album_root_path + urlparse.unquote(album.path))
+				self.response.out.write('%s (%s) @ %s<br>' % (album.title, album.path, album.timestamp))
+				#picasa_album = photos_client.InsertAlbum(title = album.title, summary = 'Imported from Facebook via FB2Google, original creation date: %s' % album.timestamp, access = "private")
+
+				photo_root_path = posixpath.split(album.path)[0] + '/'
+				album_page = minidom.parseString(archive_reader.read(album.path).replace('<BR>', '<br/>'))
+				photos = map(FBPhoto, filter(check_photo_container, album_page.getElementsByTagName('div')))
+				for photo in photos:
+					photo.path = posixpath.normpath(photo_root_path + photo.path)
+					self.response.out.write('%s (%s) @ %s<br>Tags: %s<br>' % (photo.caption, photo.path, photo.timestamp, photo.tags))
+					photo_content = archive_reader.read(photo.path)
+
+				self.response.out.write('<br>')
 				#file_content = StringIO(archive_reader.read(name))
 				#album_url = '/data/feed/api/user/%s/albumid/%s' % (self.user, self.aid)
 				#photo = self.client.InsertPhotoSimple(
