@@ -63,8 +63,10 @@ class Page(webapp.RequestHandler):
 			'is_logged': self.is_logged
 		}
 
+
 	def check_user_services(self):
 		return models.User.gql('WHERE name = :1', self.user).get().services
+
 
 	def render(self, file, values = None):
 		self.response.headers['Content-Type'] = 'text/html'
@@ -73,12 +75,14 @@ class Page(webapp.RequestHandler):
 		self.response.out.write(template.render(path, values if values else self.values))
 
 
+
 class MainPage(Page):
 	def get(self):
 		if self.is_logged:
 			self.render('upload')
 		else:
 			self.render('index')
+
 
 
 class ServicesPage(Page):
@@ -124,6 +128,7 @@ class ServicesPage(Page):
 			self.redirect('/services')
 
 
+
 class TokenPage(Page):
 	def get(self):
 		gdata_client = gdata.service.GDataService()
@@ -140,12 +145,15 @@ class TokenPage(Page):
 		gdata_client.token_store.add_token(session_token)
 		self.redirect('/upload')
 
+
+
 class UploadPage(Page):
 	def get(self):
 		if self.is_logged and self.check_user_services():
 			self.render('upload')
 		else:
 			self.redirect('/')
+
 
 	def post(self):
 		archive = self.request.get("fbContents")
@@ -167,10 +175,14 @@ class UploadPage(Page):
 			album_root_path = posixpath.dirname(photos_page_name) + '/'
 			photos_page = minidom.parseString(archive_reader.read(photos_page_name).replace('<BR>', '<br/>'))
 
+			self.response.out.write(photos_page.getElementsByTagName('div'))
+
 			albums = map(FBAlbum, filter(check_album_container, photos_page.getElementsByTagName('div')))
 			for album in albums:
 				album.path = posixpath.normpath(album_root_path + urlparse.unquote(album.path))
-				self.response.out.write('%s (%s) @ %s<br>' % (album.title, album.path, album.datetime))
+				self.response.out.write('%s (%s) @ %s<br>' % (album.title,
+				album.path,
+				album.datetime))
 
 				#TODO: Ask user album visibility preference
 				picasa_album = picasa_client.InsertAlbum(album.title, 'Imported from Facebook via FB2Google', access = "private", timestamp = album.timestamp)
@@ -186,9 +198,10 @@ class UploadPage(Page):
 						self.response.out.write('%s: %s @ %s<br>' % (comment.author, comment.message, comment.datetime))
 
 					photo_content = StringIO(archive_reader.read(photo.path))
-					picasa_photo = picasa_client.InsertPhotoSimple(picasa_album_url, photo.caption, 'Imported from Facebook via FB2Google, original creation date: %s' % photo.datetime, photo_content, 'image/jpeg', photo.tags)
+					#picasa_photo = picasa_client.InsertPhotoSimple(picasa_album_url, photo.caption, 'Imported from Facebook via FB2Google, original creation date: %s' % photo.datetime, photo_content, 'image/jpeg', photo.tags)
 
 				self.response.out.write('<br>')
+				break
 
 			archive_reader.close()
 			archive_file.close()

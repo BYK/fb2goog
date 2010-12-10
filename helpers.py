@@ -3,6 +3,7 @@ import urlparse
 import posixpath
 import xml.dom.minidom as dom
 
+
 def check_album_container(c):
 	return c.getAttribute('class') == 'album'
 
@@ -16,13 +17,13 @@ def extract_path(link, attribute_name = 'href'):
 	return urlparse.unquote(link.getAttribute(attribute_name).encode('utf-8'))
 
 def FBdatetime2timestamp(dtime):
-	return str(int(time.mktime(time.strptime(dtime, "%B %d, %Y at %H:%M"))) * 1000)
+	return str(int(time.mktime(time.strptime(dtime, "%B %d, %Y at %I:%M %p" if 'am' in dtime or 'pm' in dtime else "%B %d, %Y at %H:%M"))) * 1000)
 
 class FBAlbum(object):
 	def __init__(self, container):
 		links = container.getElementsByTagName('a')
 		self.path = extract_path(links[0])
-		self.title = links[1].firstChild.nodeValue
+		self.title = unicode(links[1].firstChild.nodeValue)
 		self.cover_photo_path = extract_path(container.getElementsByTagName('img')[0], 'src')
 
 		for elem in container.childNodes:
