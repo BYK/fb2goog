@@ -64,7 +64,10 @@ class Page(webapp.RequestHandler):
 		}
 
 
-	def check_user_services(self):
+	def check_user_services(self, service = None):
+		if service:
+			return service in models.User.gql('WHERE name = :1', self.user).get().services
+
 		return models.User.gql('WHERE name = :1', self.user).get().services
 
 
@@ -162,46 +165,48 @@ class UploadPage(Page):
 			archive_reader = zipfile.ZipFile(archive_file, 'r')
 			archive_files = archive_reader.namelist()
 
-			#TODO: Do not activate photo import if the user did not selected Picasa from services
-			picasa_client = self.services['Picasa']['client'](email = self.user.email()) #email should be given or InsertAlbum fails
-			gdata.alt.appengine.run_on_appengine(picasa_client)
+			if self.check_user_services('Picasa'):		
+				picasa_client = self.services['Picasa']['client'](email = self.user.email()) #email should be given or InsertAlbum fails
+				gdata.alt.appengine.run_on_appengine(picasa_client)
 
-			#TODO: Should check if an album with the same name exists and ask wheter to replace it, add into it or create a new one
-			#user_albums = picasa_client.GetUserFeed(user = self.user).entry
-			#for album in user_albums:
-			#	self.response.out.write('title: %s, number of photos: %s, id: %s' % (album.title.text, album.numphotos.text, album.gphoto_id))
+				#TODO: Should check if an album with the same name exists and ask wheter to replace it, add into it or create a new one
+				#user_albums = picasa_client.GetUserFeed(user = self.user).entry
+				#for album in user_albums:
+				#	self.response.out.write('title: %s, number of photos: %s, id: %s' % (album.title.text, album.numphotos.text, album.gphoto_id))
 
-			photos_page_name = filter(lambda x: x.endswith('photos.html'), archive_files)[0]
-			album_root_path = posixpath.dirname(photos_page_name) + '/'
-			photos_page = minidom.parseString(archive_reader.read(photos_page_name).replace('<BR>', '<br/>'))
+				photos_page_name = filter(lambda x: x.endswith('photos.html'), archive_files)[0]
+				album_root_path = posixpath.dirname(photos_page_name) + '/'
+				photos_page = minidom.parseString(archive_reader.read(photos_page_name).replace('<BR>', '<br/>'))
 
-			self.response.out.write(photos_page.getElementsByTagName('div'))
+				self.response.out.write(photos_page.getElementsByTagName('div'))
 
-			albums = map(FBAlbum, filter(check_album_container, photos_page.getElementsByTagName('div')))
-			for album in albums:
-				album.path = posixpath.normpath(album_root_path + urlparse.unquote(album.path))
-				self.response.out.write('%s (%s) @ %s<br>' % (album.title,
-				album.path,
-				album.datetime))
+				albums = map(FBAlbum, filter(check_album_container, photos_page.getElementsByTagName('div')))
+				for album in albums:
+					album.path = posixpath.normpath(album_root_path + urlparse.unquote(album.path))
+					self.response.out.write('%s (%s) @ %s<br>' % (album.title,
+					album.path,
+					album.datetime))
 
-				#TODO: Ask user album visibility preference
-				picasa_album = picasa_client.InsertAlbum(album.title, 'Imported from Facebook via FB2Google', access = "private", timestamp = album.timestamp)
-				picasa_album_url = '/data/feed/api/user/default/albumid/%s' % picasa_album.gphoto_id.text
+					#TODO: Ask user album visibility preference
+					picasa_album = picasa_client.InsertAlbum(album.title, 'Imported from Facebook via FB2Google', access = "private", timestamp = album.timestamp)
+					picasa_album_url = '/data/feed/api/user/default/albumid/%s' % picasa_album.gphoto_id.text
 
-				photo_root_path = posixpath.dirname(album.path) + '/'
-				album_page = minidom.parseString(archive_reader.read(album.path).replace('<BR>', '<br/>'))
-				photos = map(FBPhoto, filter(check_photo_container, album_page.getElementsByTagName('div')))
-				for photo in photos:
-					photo.path = posixpath.normpath(photo_root_path + photo.path)
-					self.response.out.write('%s (%s) @ %s<br>Tags: %s<br>' % (photo.caption, photo.path, photo.datetime, ', '.join(photo.tags)))
-					for comment in photo.comments:
-						self.response.out.write('%s: %s @ %s<br>' % (comment.author, comment.message, comment.datetime))
+					photo_root_path = posixpath.dirname(album.path) + '/'
+					album_page = minidom.parseString(archive_reader.read(album.path).replace('<BR>', '<br/>'))
+					photos = map(FBPhoto, filter(check_photo_container, album_page.getElementsByTagName('div')))
+					for photo in photos:
+						photo.path = posixpath.normpath(photo_root_path + photo.path)
+						self.response.out.write('%s (%s) @ %s<br>Tags: %s<br>' % (photo.caption, photo.path, photo.datetime, ', '.join(photo.tags)))
+						for comment in photo.comments:
+							self.response.out.write('%s: %s @ %s<br>' % (comment.author, comment.message, comment.datetime))
 
-					photo_content = StringIO(archive_reader.read(photo.path))
-					#picasa_photo = picasa_client.InsertPhotoSimple(picasa_album_url, photo.caption, 'Imported from Facebook via FB2Google, original creation date: %s' % photo.datetime, photo_content, 'image/jpeg', photo.tags)
+						photo_content = StringIO(archive_reader.read(photo.path))
+						#picasa_photo = picasa_client.InsertPhotoSimple(picasa_album_url, photo.caption, 'Imported from Facebook via FB2Google, original creation date: %s' % photo.datetime, photo_content, 'image/jpeg', photo.tags)
 
-				self.response.out.write('<br>')
-				break
+					self.response.out.write('<br>')
+					break
+			else:
+				self.response.out.write('No permission: Picasa')
 
 			archive_reader.close()
 			archive_file.close()
