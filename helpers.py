@@ -17,7 +17,7 @@ def extract_path(link, attribute_name = 'href'):
 	return urlparse.unquote(link.getAttribute(attribute_name).encode('utf-8'))
 
 def FBdatetime2timestamp(dtime):
-	return str(int(time.mktime(time.strptime(dtime, "%B %d, %Y at %I:%M %p" if 'am' in dtime or 'pm' in dtime else "%B %d, %Y at %H:%M"))) * 1000)
+	return str(int(time.mktime(time.strptime(dtime, "%B %d, %Y at %I:%M %p" if dtime.endswith('am') or dtime.endswith('pm') else "%B %d, %Y at %H:%M"))) * 1000)
 
 class FBAlbum(object):
 	def __init__(self, container):
