@@ -16,6 +16,7 @@ import gdata.photos.service
 import gdata.service
 
 from google.appengine.api import users
+from google.appengine.ext import db
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp.util import run_wsgi_app
 from google.appengine.ext.webapp import template
@@ -64,12 +65,18 @@ class Page(webapp.RequestHandler):
 		}
 
 
-	def check_user_services(self, service = None):
-		if service:
-			return service in models.User.gql('WHERE name = :1', self.user).get().services
+	def get_user_info(self):
+		if self.is_logged:
+			return models.User.gql('WHERE name=:1', self.user).get()
+		else:
+			return None
 
-		return models.User.gql('WHERE name = :1', self.user).get().services
-
+	def get_user_services(self):
+		user_info = self.get_user_info()
+		if user_info:
+			return user_info.services
+		else:
+			None
 
 	def render(self, file, values = None):
 		self.response.headers['Content-Type'] = 'text/html'
@@ -105,7 +112,7 @@ class ServicesPage(Page):
 	def post(self):
 		selected_services = self.request.POST.getall('services')
 
-		user_info = models.User.gql('WHERE name=:1', self.user).get()
+		user_info = self.get_user_info()
 		if not user_info:
 			user_info = models.User()
 
@@ -149,23 +156,35 @@ class TokenPage(Page):
 		self.redirect('/upload')
 
 
-
 class UploadPage(Page):
 	def get(self):
-		if self.is_logged and self.check_user_services():
+		if self.is_logged and self.get_user_services():
 			self.render('upload')
 		else:
 			self.redirect('/')
 
 
 	def post(self):
-		archive = self.request.get("fbContents")
+		#TODO: Use Blobstore to store large user data
+		data = self.request.get("fbContents")
+		if self.is_logged and data:
+			user_info = self.get_user_info()
+			user_info.data = db.Blob(data)
+			user_info.put()
+			self.render('saved')
+		else:
+			self.render('upload')
+
+
+class ProcessPage(Page):
+	def get(self):
+		archive = self.get_user_info().data
 		if archive:
 			archive_file = StringIO(archive)
 			archive_reader = zipfile.ZipFile(archive_file, 'r')
 			archive_files = archive_reader.namelist()
 
-			if self.check_user_services('Picasa'):		
+			if 'Picasa' in self.get_user_services():
 				picasa_client = self.services['Picasa']['client'](email = self.user.email()) #email should be given or InsertAlbum fails
 				gdata.alt.appengine.run_on_appengine(picasa_client)
 
@@ -183,11 +202,10 @@ class UploadPage(Page):
 				albums = map(FBAlbum, filter(check_album_container, photos_page.getElementsByTagName('div')))
 				for album in albums:
 					album.path = posixpath.normpath(album_root_path + urlparse.unquote(album.path))
-					self.response.out.write('%s (%s) @ %s<br>' % (album.title,
-					album.path,
-					album.datetime))
+					self.response.out.write('%s (%s) @ %s<br>' % (album.title, album.path, album.datetime))
 
 					#TODO: Ask user album visibility preference
+					#TODO: Put album creation code in a try-catch block to handle possible errors
 					picasa_album = picasa_client.InsertAlbum(album.title, 'Imported from Facebook via FB2Google', access = "private", timestamp = album.timestamp)
 					picasa_album_url = '/data/feed/api/user/default/albumid/%s' % picasa_album.gphoto_id.text
 
@@ -201,7 +219,8 @@ class UploadPage(Page):
 							self.response.out.write('%s: %s @ %s<br>' % (comment.author, comment.message, comment.datetime))
 
 						photo_content = StringIO(archive_reader.read(photo.path))
-						#picasa_photo = picasa_client.InsertPhotoSimple(picasa_album_url, photo.caption, 'Imported from Facebook via FB2Google, original creation date: %s' % photo.datetime, photo_content, 'image/jpeg', photo.tags)
+						#TODO: put image upload code into a try-catch block to handle possible errors
+						picasa_photo = picasa_client.InsertPhotoSimple(picasa_album_url, photo.caption, 'Imported from Facebook via FB2Google, original creation date: %s' % photo.datetime, photo_content, 'image/jpeg', photo.tags)
 
 					self.response.out.write('<br>')
 					break
@@ -218,6 +237,7 @@ application = webapp.WSGIApplication(
 	[
 		('/', MainPage),
 		('/upload', UploadPage),
+		('/process', ProcessPage),
 		('/services', ServicesPage),
 		('/token', TokenPage),
 	],
