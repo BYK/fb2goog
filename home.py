@@ -78,6 +78,10 @@ class Page(webapp.RequestHandler):
 		self.response.out.write(template.render(path, values if values else self.values))
 
 
+	def write(self, string):
+		self.response.out.write(string)		
+
+
 
 class MainPage(Page):
 	def get(self):
@@ -206,12 +210,12 @@ class UploadPage(Page):
 					self.response.out.write('<br>')
 					break
 			else:
-				self.response.out.write('No permission for Picasa.')
+				self.write('No permission for Picasa.')
 
 			archive_reader.close()
 			archive_file.close()
 		else:
-			self.response.out.write('No file.')
+			self.write('No file.')
 
 
 application = webapp.WSGIApplication(
