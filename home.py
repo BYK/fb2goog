@@ -206,12 +206,12 @@ class UploadPage(Page):
 					self.response.out.write('<br>')
 					break
 			else:
-				self.response.out.write('No permission: Picasa')
+				self.response.out.write('No permission for Picasa.')
 
 			archive_reader.close()
 			archive_file.close()
 		else:
-			self.response.out.write('No file')
+			self.response.out.write('No file.')
 
 
 application = webapp.WSGIApplication(
