@@ -72,8 +72,6 @@ class Page(webapp.RequestHandler):
 
 
 	def render(self, file, values = None):
-		self.response.headers['Content-Type'] = 'text/html'
-
 		path = posixpath.join(posixpath.dirname(__file__), 'templates/%s.html' % file)
 		self.response.out.write(template.render(path, values if values else self.values))
 
