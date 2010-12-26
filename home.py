@@ -31,8 +31,6 @@ from helpers import *
 
 sys.setrecursionlimit(10000) # SDK fix
 
-sys.setdefaultencoding('utf8')
-
 
 class Page(webapp.RequestHandler):
 	services = {
