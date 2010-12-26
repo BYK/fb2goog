@@ -3,7 +3,6 @@
 import os
 import posixpath
 import re
-import pprint
 import sys
 import urllib
 import xml.dom.minidom as minidom
