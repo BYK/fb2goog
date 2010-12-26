@@ -10,6 +10,9 @@ handlers:
 - url: /upload
   script: home.py
 
+- url: /process
+  script: home.py
+
 - url: /services
   script: home.py
 
