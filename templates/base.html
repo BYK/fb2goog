@@ -14,7 +14,7 @@
 		<header>
 			<div id="user">
 			{% if is_logged %}
-				<strong>{{ user }}</strong> - <a href="{{ url }}" title="Sign out">Sign out</a>
+				<strong>{{ user }}</strong> - <a href="/services" title="Services">Services</a> - <a href="{{ url }}" title="Sign out">Sign out</a>
 				{% else %}
 				<a href="{{ url }}" id="goog-login-button" title="Sign in with Google Accounts">Sign in with Google Accounts</a>
 			{% endif %}
