@@ -31,7 +31,9 @@ class FBAlbum(object):
 				self.datetime = elem.firstChild.nodeValue
 				self.timestamp = FBdatetime2timestamp(self.datetime)
 				break
-
+			else:
+				self.datetime = None
+				self.timestamp = None
 
 class FBPhoto(object):
 	def __init__(self, container):

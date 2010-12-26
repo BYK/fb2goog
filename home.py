@@ -3,7 +3,9 @@
 import os
 import posixpath
 import re
+import pprint
 import sys
+import urllib
 import xml.dom.minidom as minidom
 import zipfile
 
@@ -16,10 +18,12 @@ import gdata.photos.service
 import gdata.service
 
 from google.appengine.api import users
+from google.appengine.ext import blobstore
 from google.appengine.ext import db
 from google.appengine.ext import webapp
-from google.appengine.ext.webapp.util import run_wsgi_app
+from google.appengine.ext.webapp import blobstore_handlers
 from google.appengine.ext.webapp import template
+from google.appengine.ext.webapp.util import run_wsgi_app
 
 import models
 
@@ -27,6 +31,8 @@ from helpers import *
 
 
 sys.setrecursionlimit(10000) # SDK fix
+
+sys.setdefaultencoding('utf8')
 
 
 class Page(webapp.RequestHandler):
@@ -91,7 +97,8 @@ class Page(webapp.RequestHandler):
 class MainPage(Page):
 	def get(self):
 		if self.is_logged:
-			self.render('upload')
+			upload_url = blobstore.create_upload_url('/upload')
+			self.render('upload', {'upload_url': upload_url})
 		else:
 			self.render('index')
 
@@ -158,29 +165,39 @@ class TokenPage(Page):
 		self.redirect('/upload')
 
 
-class UploadPage(Page):
+class UploadPage(blobstore_handlers.BlobstoreUploadHandler, Page):
 	def get(self):
 		if self.is_logged and self.get_user_services():
-			self.render('upload')
+			upload_url = blobstore.create_upload_url('/upload')
+			self.render('upload', {'upload_url': upload_url})
 		else:
 			self.redirect('/')
 
 
 	def post(self):
-		#TODO: Use Blobstore to store large user data
-		data = self.request.get("fbContents")
+		data = self.get_uploads('fbContents')
 		if self.is_logged and data:
-			user_info = self.get_user_info()
-			user_info.data = db.Blob(data)
-			user_info.put()
-			self.render('saved')
+			blob_info = data[0]
+			self.redirect('/saved/%s' % blob_info.key())
 		else:
-			self.render('upload')
+			self.redirect('/')
+
+
+class SavedPage(Page):
+	def get(self, blob_key):
+		user_info = self.get_user_info()
+		user_info.blob_key = str(urllib.unquote(blob_key))
+		user_info.put()
+
+		self.render('saved')
 
 
 class ProcessPage(Page):
 	def get(self):
-		archive = self.get_user_info().data
+		blob_key = self.get_user_info().blob_key
+		blob_reader = blobstore.BlobReader(blob_key)
+		archive = blob_reader.read()
+
 		if archive:
 			archive_file = StringIO(archive)
 			archive_reader = zipfile.ZipFile(archive_file, 'r')
@@ -199,16 +216,14 @@ class ProcessPage(Page):
 				album_root_path = posixpath.dirname(photos_page_name) + '/'
 				photos_page = minidom.parseString(archive_reader.read(photos_page_name).replace('<BR>', '<br/>'))
 
-				self.response.out.write(photos_page.getElementsByTagName('div'))
-
 				albums = map(FBAlbum, filter(check_album_container, photos_page.getElementsByTagName('div')))
 				for album in albums:
 					album.path = posixpath.normpath(album_root_path + urlparse.unquote(album.path))
-					self.response.out.write('%s (%s) @ %s<br>' % (album.title, album.path, album.datetime))
+					self.response.out.write('%s (%s) @ %s %s<br>' % (album.title, album.path, album.datetime, album.timestamp))
 
 					#TODO: Ask user album visibility preference
 					#TODO: Put album creation code in a try-catch block to handle possible errors
-					picasa_album = picasa_client.InsertAlbum(album.title, 'Imported from Facebook via FB2Google', access = "private", timestamp = album.timestamp)
+					"""picasa_album = picasa_client.InsertAlbum(album.title, 'Imported from Facebook via FB2Google', access = "private", timestamp = album.timestamp)
 					picasa_album_url = '/data/feed/api/user/default/albumid/%s' % picasa_album.gphoto_id.text
 
 					photo_root_path = posixpath.dirname(album.path) + '/'
@@ -223,9 +238,8 @@ class ProcessPage(Page):
 						photo_content = StringIO(archive_reader.read(photo.path))
 						#TODO: put image upload code into a try-catch block to handle possible errors
 						picasa_photo = picasa_client.InsertPhotoSimple(picasa_album_url, photo.caption, 'Imported from Facebook via FB2Google, original creation date: %s' % photo.datetime, photo_content, 'image/jpeg', photo.tags)
+					"""
 
-					self.response.out.write('<br>')
-					break
 			else:
 				self.write('No permission for Picasa.')
 
@@ -242,6 +256,7 @@ application = webapp.WSGIApplication(
 		('/process', ProcessPage),
 		('/services', ServicesPage),
 		('/token', TokenPage),
+		('/saved/([^/]+)?', SavedPage),
 	],
 	debug = True
 )

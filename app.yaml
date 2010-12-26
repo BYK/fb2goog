@@ -19,6 +19,9 @@ handlers:
 - url: /token
   script: home.py
 
+- url: /saved/([^/]+)?
+  script: home.py
+
 - url: /index\.html
   script: home.py
   
