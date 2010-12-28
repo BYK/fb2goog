@@ -1,5 +1,5 @@
 import time
-import urlparse
+import urllib
 import posixpath
 import xml.dom.minidom as dom
 
@@ -14,7 +14,7 @@ def check_comment_container(c):
 	return c.getAttribute('class') == 'comment'
 
 def extract_path(link, attribute_name = 'href'):
-	return urlparse.unquote(link.getAttribute(attribute_name).encode('utf-8'))
+	return urllib.unquote(link.getAttribute(attribute_name).encode('utf-8'))
 
 def FBdatetime2timestamp(dtime):
 	return str(int(time.mktime(time.strptime(dtime, "%B %d, %Y at %I:%M %p" if dtime.endswith('am') or dtime.endswith('pm') else "%B %d, %Y at %H:%M"))) * 1000)
