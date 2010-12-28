@@ -215,7 +215,7 @@ class ProcessPage(Page):
 
 				albums = map(FBAlbum, filter(check_album_container, photos_page.getElementsByTagName('div')))
 				for album in albums:
-					album.path = posixpath.normpath(album_root_path + urlparse.unquote(album.path))
+					album.path = posixpath.normpath(album_root_path + urllib.unquote(album.path))
 					self.response.out.write('%s (%s) @ %s %s<br>' % (album.title, album.path, album.datetime, album.timestamp))
 
 					#TODO: Ask user album visibility preference
