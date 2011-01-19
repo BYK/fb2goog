@@ -87,7 +87,7 @@ class Page(webapp.RequestHandler):
 
 
 	def write(self, string):
-		self.response.out.write(string)		
+		self.response.out.write(string)
 
 
 
@@ -205,20 +205,41 @@ class ProcessPage(Page):
 				gdata.alt.appengine.run_on_appengine(picasa_client)
 
 				#TODO: Should check if an album with the same name exists and ask wheter to replace it, add into it or create a new one
-				#user_albums = picasa_client.GetUserFeed(user = self.user).entry
-				#for album in user_albums:
-				#	self.response.out.write('title: %s, number of photos: %s, id: %s' % (album.title.text, album.numphotos.text, album.gphoto_id))
+				user_albums = picasa_client.GetUserFeed(user = self.user).entry
+				for album in user_albums:
+					self.response.out.write('title: %s, number of photos: %s, id: %s' % (album.title.text, album.numphotos.text, album.gphoto_id))
 
-				photos_page_name = filter(lambda x: x.endswith('photos.html'), archive_files)[0]
-				album_root_path = posixpath.dirname(photos_page_name) + '/'
-				photos_page = minidom.parseString(archive_reader.read(photos_page_name).replace('<BR>', '<br/>'))
-
-				albums = map(FBAlbum, filter(check_album_container, photos_page.getElementsByTagName('div')))
+				albums = get_FB_albums(archive_reader, album_root_path)
 				for album in albums:
-					album.path = posixpath.normpath(album_root_path + urllib.unquote(album.path))
+					self.response.out.write('%s (%s) @ %s %s<br>' % (album.title, album.path, album.datetime, album.timestamp))
+					#TODO: Ask user album visibility preference
+
+			else:
+				self.write('No permission for Picasa.')
+
+			archive_reader.close()
+			archive_file.close()
+		else:
+			self.redirect('/upload')
+
+	def post(self):
+		blob_key = self.get_user_info().blob_key
+		blob_reader = blobstore.BlobReader(blob_key)
+		archive = blob_reader.read()
+
+		if archive:
+			archive_file = StringIO(archive)
+			archive_reader = zipfile.ZipFile(archive_file, 'r')
+			archive_files = archive_reader.namelist()
+
+			if 'Picasa' in self.get_user_services():
+				picasa_client = self.services['Picasa']['client'](email = self.user.email()) #email should be given or InsertAlbum fails
+				gdata.alt.appengine.run_on_appengine(picasa_client)
+
+				albums = get_FB_albums(archive_reader, album_root_path)
+				for album in albums:
 					self.response.out.write('%s (%s) @ %s %s<br>' % (album.title, album.path, album.datetime, album.timestamp))
 
-					#TODO: Ask user album visibility preference
 					#TODO: Put album creation code in a try-catch block to handle possible errors
 					"""picasa_album = picasa_client.InsertAlbum(album.title, 'Imported from Facebook via FB2Google', access = "private", timestamp = album.timestamp)
 					picasa_album_url = '/data/feed/api/user/default/albumid/%s' % picasa_album.gphoto_id.text
@@ -243,7 +264,7 @@ class ProcessPage(Page):
 			archive_reader.close()
 			archive_file.close()
 		else:
-			self.write('No file.')
+			self.redirect('/upload')
 
 
 application = webapp.WSGIApplication(

@@ -19,10 +19,16 @@ def extract_path(link, attribute_name = 'href'):
 def FBdatetime2timestamp(dtime):
 	return str(int(time.mktime(time.strptime(dtime, "%B %d, %Y at %I:%M %p" if dtime.endswith('am') or dtime.endswith('pm') else "%B %d, %Y at %H:%M"))) * 1000)
 
+def get_FB_albums(archive_reader, root_path):
+	photos_page_name = filter(lambda x: x.endswith('photos.html'), archive_reader.namelist())[0]
+	album_root_path = posixpath.dirname(photos_page_name) + '/'
+	photos_page = minidom.parseString(archive_reader.read(photos_page_name).replace('<BR>', '<br/>'))
+	return map(lambda c:FBAlbum(c, root_path), filter(check_album_container, photos_page.getElementsByTagName('div')))
+
 class FBAlbum(object):
-	def __init__(self, container):
+	def __init__(self, container, root_path = ""):
 		links = container.getElementsByTagName('a')
-		self.path = extract_path(links[0])
+		self.path = posixpath.normpath(root_path + urllib.unquote(extract_path(links[0])))
 		self.title = unicode(links[1].firstChild.nodeValue)
 		self.cover_photo_path = extract_path(container.getElementsByTagName('img')[0], 'src')
 
