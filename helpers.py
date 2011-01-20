@@ -4,26 +4,34 @@ import posixpath
 import xml.dom.minidom as dom
 
 
-def check_album_container(c):
-	return c.getAttribute('class') == 'album'
-
-def check_photo_container(c):
-	return c.getAttribute('class') == 'photo'
-
-def check_comment_container(c):
-	return c.getAttribute('class') == 'comment'
-
 def extract_path(link, attribute_name = 'href'):
 	return urllib.unquote(link.getAttribute(attribute_name).encode('utf-8'))
 
 def FBdatetime2timestamp(dtime):
-	return str(int(time.mktime(time.strptime(dtime, "%B %d, %Y at %I:%M %p" if dtime.endswith('am') or dtime.endswith('pm') else "%B %d, %Y at %H:%M"))) * 1000)
+	try: #try to parse using standart US date format
+		return str(int(time.mktime(time.strptime(dtime, "%B %d, %Y at %I:%M %p" if dtime.endswith('am') or dtime.endswith('pm') else "%B %d, %Y at %H:%M"))) * 1000)
+	except: #return None if parsing fails
+		return None
 
-def get_FB_albums(archive_reader, root_path):
-	photos_page_name = filter(lambda x: x.endswith('photos.html'), archive_reader.namelist())[0]
+def get_FB_albums(archive_reader):
+	for photos_page_name in (name for name in archive_reader.namelist() if name.endswith('photos.html')):
+		break #Get the first entry in the file list ending with "photos.html"
 	album_root_path = posixpath.dirname(photos_page_name) + '/'
-	photos_page = minidom.parseString(archive_reader.read(photos_page_name).replace('<BR>', '<br/>'))
-	return map(lambda c:FBAlbum(c, root_path), filter(check_album_container, photos_page.getElementsByTagName('div')))
+	photos_page = dom.parseString(archive_reader.read(photos_page_name).replace('<BR>', '<br/>'))
+	albums = {}
+	for container in photos_page.getElementsByTagName('div'):
+		if container.getAttribute('class') == 'album':
+			parsedAlbum = FBAlbum(container, album_root_path)
+			albums[parsedAlbum.title] = parsedAlbum
+	return albums
+
+def get_FB_album_photos(archive_reader, album):
+	photo_root_path = posixpath.dirname(album.path) + '/'
+	album_page = dom.parseString(archive_reader.read(album.path).replace('<BR>', '<br/>'))
+	photos = []
+	for container in album_page.getElementsByTagName('div'):
+		if container.getAttribute('class') == 'photo':
+			photos.append(FBPhoto(container, photo_root_path))
 
 class FBAlbum(object):
 	def __init__(self, container, root_path = ""):
@@ -42,10 +50,10 @@ class FBAlbum(object):
 				self.timestamp = None
 
 class FBPhoto(object):
-	def __init__(self, container):
+	def __init__(self, container, root_path = ""):
 		#Each link -> [*empty*, photo_path, original_photo_path]
 		links = container.getElementsByTagName('a')
-		self.path = extract_path(links[1])
+		self.path = posixpath.normpath(root_path + extract_path(links[1]))
 		self.datetime = links[2].getElementsByTagName('span')[0].firstChild.nodeValue
 		self.timestamp = FBdatetime2timestamp(self.datetime)
 
@@ -70,7 +78,10 @@ class FBPhoto(object):
 
 				break
 
-		self.comments = map(FBComment, filter(check_comment_container, container.getElementsByTagName('div')))
+		self.comments = []
+		for comment_container in container.getElementsByTagName('div'):
+			if comment_container.getAttribute('class') == 'comment':
+				self.comments.append(FBComment(comment_container))
 
 
 class FBComment(object):
