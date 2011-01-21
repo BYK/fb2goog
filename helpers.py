@@ -32,6 +32,7 @@ def get_FB_album_photos(archive_reader, album):
 	for container in album_page.getElementsByTagName('div'):
 		if container.getAttribute('class') == 'photo':
 			photos.append(FBPhoto(container, photo_root_path))
+	return photos
 
 class FBAlbum(object):
 	def __init__(self, container, root_path = ""):

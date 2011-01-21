@@ -82,11 +82,12 @@ class Page(webapp.RequestHandler):
 	def get_user_archive(self):
 		blob_key = self.get_user_info().blob_key
 		archive_blob = blobstore.BlobReader(blob_key)
-		return zipfile.ZipFile(archive_blob, 'r') if archive_blob else None
+		return zipfile.ZipFile(archive_blob, 'r') if archive_blob else None #returned file should be manually "closed", might be dangerous
 
-	def render(self, file, values = None):
+	def render(self, file, values = {}):
+		values.update(self.values)
 		path = posixpath.join(posixpath.dirname(__file__), 'templates/%s.html' % file)
-		self.response.out.write(template.render(path, values if values else self.values))
+		self.response.out.write(template.render(path, values))
 
 	def write(self, string):
 		self.response.out.write(string)
@@ -95,6 +96,8 @@ class Page(webapp.RequestHandler):
 class MainPage(Page):
 	def get(self):
 		if self.is_logged:
+			#TODO: Create a case block here for proper redirects: upload if blobstore is empty, services if no services activated, process if everything is OK
+			#TODO: redirection to upload page should be a separate routine due to special "create_upload_url" system
 			upload_url = blobstore.create_upload_url('/upload')
 			self.render('upload', {'upload_url': upload_url})
 		else:
@@ -103,8 +106,7 @@ class MainPage(Page):
 
 class ServicesPage(Page):
 	def get(self):
-		values = self.values.copy()
-		values['services'] = []
+		values = {'services': []}
 
 		for service in self.services:
 			values['services'].append({
@@ -143,7 +145,6 @@ class ServicesPage(Page):
 			self.redirect('/services')
 
 
-
 class TokenPage(Page):
 	def get(self):
 		gdata_client = gdata.service.GDataService()
@@ -169,7 +170,6 @@ class UploadPage(blobstore_handlers.BlobstoreUploadHandler, Page):
 		else:
 			self.redirect('/')
 
-
 	def post(self):
 		data = self.get_uploads('fbContents')
 		if self.is_logged and data:
@@ -192,34 +192,33 @@ class ProcessPage(Page):
 	def get(self):
 		archive = self.get_user_archive()
 		if archive:
+			template_values = {}
 			archive_files = archive.namelist()
 
-			#TODO: Wrap the functionality below in a class and use a dict "Name" -> Class Constructor for automatic and flexible service support
+			#TODO: Wrap the functionality below in a class and use it in the Page.services for automatic and flexible service support
 			if 'Picasa' in self.get_user_services():
+				template_values['Picasa'] = {}
 				picasa_client = self.services['Picasa']['client'](email = self.user.email()) #email should be given or InsertAlbum fails
 				gdata.alt.appengine.run_on_appengine(picasa_client)
 
-				#TODO: Should check if an album with the same name exists and ask wheter to replace it, add into it or create a new one
 				picasa_albums = picasa_client.GetUserFeed(user = self.user).entry
-
-				albums = get_FB_albums(archive)
-				for album in albums.values():
+				albums = get_FB_albums(archive).values()
+				for album in albums:
 					picasa_album_id = None
-					for picasa_album_id in (picasa_album.gphoto_id for picasa_album in picasa_albums if picasa_album.title.text == album.title):
+					for picasa_album_id in (picasa_album.gphoto_id.text for picasa_album in picasa_albums if picasa_album.title.text == album.title):
 						break
-
 					album.picasa_id = picasa_album_id
+
 					#TODO: Prepare template and output variable for visibility and override preferences("albums" already proper?)
-					self.response.out.write('%s (%s) @ %s %s - on picasa: %s<br>' % (album.title, album.path, album.datetime, album.timestamp, album.picasa_id))
-			else:
-				#TODO: Prepare a better error page template which has a link to the "/services" page to grant permission on demand
-				self.write('No permission for Picasa.')
+					template_values['Picasa']['albums'] = albums
+					#self.response.out.write('%s (%s) @ %s %s - on picasa: %s<br>' % (album.title, album.path, album.datetime, album.timestamp, album.picasa_id))
 
 			archive.close()
+			self.render('process', template_values)
 		else:
 			self.redirect('/upload')
 
-	def post(self):
+	def post(self): #TODO: Create a much better interface for this one. Maybe AJAX?
 		archive = self.get_user_archive()
 		if archive:
 			archive_files = archive.namelist()
@@ -233,30 +232,32 @@ class ProcessPage(Page):
 				albums_with_error = []
 				for album_title in albums_enabled:
 					album = albums[album_title]
+					album.picasa_id = self.request.POST.get('album_%s_picasa_id' % (album.title), None)
 					self.response.out.write('%s (%s) @ %s %s<br>' % (album.title, album.path, album.datetime, album.timestamp))
 
 					if not album.picasa_id:
 						try:
-							picasa_album = picasa_client.InsertAlbum(album.title, 'Imported from Facebook via FB2Google', access = self.request.POST.get('album_%s_vsisibility' % (album.title), 'private'), timestamp = album.timestamp)
-							album.picasa_id = picasa_album.gphoto_id
+							picasa_album = picasa_client.InsertAlbum(album.title, 'Imported from Facebook via FB2Google', access = self.request.POST.get('album_%s_visibility' % (album.title), 'private'), timestamp = album.timestamp)
+							album.picasa_id = picasa_album.gphoto_id.text
 						except: # SomeError as Something?
 							albums_with_error.append(album_title) #or a dict with error details? may be including failed photos list?
 							continue
 
-					picasa_album_url = '/data/feed/api/user/default/albumid/%s' % picasa_album.gphoto_id
+					picasa_album_url = '/data/feed/api/user/default/albumid/%s' % album.picasa_id
 
-					photos = get_FB_album_photos(archive)
+					photos = get_FB_album_photos(archive, album)
 					for photo in photos:
 						self.response.out.write('%s (%s) @ %s<br>Tags: %s<br>' % (photo.caption, photo.path, photo.datetime, ', '.join(photo.tags)))
 						for comment in photo.comments:
 							self.response.out.write('%s: %s @ %s<br>' % (comment.author, comment.message, comment.datetime))
 
-						photo_content = StringIO(archive_reader.read(photo.path))
+						photo_content = StringIO(archive.read(photo.path))
 						#TODO: put image upload code into a try-catch block to handle possible errors
 						try:
 							picasa_photo = picasa_client.InsertPhotoSimple(picasa_album_url, photo.caption, 'Imported from Facebook via FB2Google, original creation date: %s' % photo.datetime, photo_content, 'image/jpeg', photo.tags)
 						except: # SomeError as Something?
 							#TODO: Log the failed photo somewhere.
+							self.response.out.write('<br><strong>Failed!</strong><br>')
 							continue
 
 			else:
