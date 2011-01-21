@@ -31,7 +31,7 @@ handlers:
 - url: /token
   script: home.py
 
-- url: /saved/([^/]+)?
+- url: /saved
   script: home.py
 
 - url: /index\.html

@@ -176,17 +176,18 @@ class UploadPage(blobstore_handlers.BlobstoreUploadHandler, Page):
 		data = self.get_uploads('fbContents')
 		if self.is_logged and data:
 			blob_info = data[0]
-			self.redirect('/saved/%s' % blob_info.key())
+			user_info = self.get_user_info()
+			if user_info.blob_key:
+				blobstore.delete(user_info.blob_key)
+			user_info.blob_key = str(blob_info.key())
+			user_info.put()
+			self.redirect('/saved')
 		else:
 			self.redirect('/')
 
 
-class SavedPage(Page):
-	def get(self, blob_key):
-		user_info = self.get_user_info()
-		user_info.blob_key = str(urllib.unquote(blob_key))
-		user_info.put()
-
+class SavedPage(Page): #Unnecesary?
+	def get(self):
 		self.render('saved')
 
 
@@ -277,7 +278,7 @@ application = webapp.WSGIApplication(
 		('/process', ProcessPage),
 		('/services', ServicesPage),
 		('/token', TokenPage),
-		('/saved/([^/]+)?', SavedPage),
+		('/saved', SavedPage),
 	],
 	debug = True
 )
