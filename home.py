@@ -76,11 +76,13 @@ class Page(webapp.RequestHandler):
 		user_info = self.get_user_info()
 		if user_info:
 			return user_info.services
-		else:
-			None
 
 	def get_user_archive(self):
-		blob_key = self.get_user_info().blob_key
+		user_info = self.get_user_info()
+		if not user_info:
+			return None
+
+		blob_key = user_info.blob_key
 		archive_blob = blobstore.BlobReader(blob_key)
 		return zipfile.ZipFile(archive_blob, 'r') if archive_blob else None #returned file should be manually "closed", might be dangerous
 
