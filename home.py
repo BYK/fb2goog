@@ -262,7 +262,7 @@ class ProcessPage(Page):
 						#TODO: put image upload code into a try-catch block to handle possible errors
 						try:
 							picasa_photo = picasa_client.InsertPhotoSimple(picasa_album_url, photo.caption, 'Imported from Facebook via FB2Google, original creation date: %s' % photo.datetime, photo_content, 'image/jpeg', photo.tags)
-						except GooglePhotosExveption:
+						except GooglePhotosException:
 							logging.exception('Uploading of a photo failed. (User: %s, Album: %s, Photo: %s)', self.user, album.title, photo.caption)
 							continue
 					logging.debug('Importing of album %s completed.', album.title)
