@@ -1,5 +1,6 @@
 # coding: utf-8
 
+import logging
 import os
 import posixpath
 import re
@@ -221,34 +222,37 @@ class ProcessPage(Page):
 		else:
 			self.redirect('/upload')
 
-	def post(self): #TODO: Create a much better interface for this one. Maybe AJAX?
+	def post(self): #TODO: Separate this part for "task" section
+		logging.info('Import request received for user %s', self.user)
 		archive = self.get_user_archive()
 		if archive:
 			archive_files = archive.namelist()
 
 			if 'Picasa' in self.get_user_services():
+				logging.debug('Getting Picasa client for user %s', self.user)
 				picasa_client = self.services['Picasa']['client'](email = self.user.email()) #email should be given or InsertAlbum fails
 				gdata.alt.appengine.run_on_appengine(picasa_client)
+				logging.debug('Picasa client for user %s initialized.', self.user)
 
 				albums_enabled = self.request.POST.getall('albums_enabled')
 				albums = get_FB_albums(archive)
-				albums_with_error = []
+				logging.info('Parsed %d albums for user %s.', albums.__len__(), self.user)
 				for album_title in albums_enabled:
 					album = albums[album_title]
 					album.picasa_id = self.request.POST.get('album_%s_picasa_id' % (album.title), None)
 					self.response.out.write('%s (%s) @ %s %s<br>' % (album.title, album.path, album.datetime, album.timestamp))
 
 					if not album.picasa_id:
-						try:
-							picasa_album = picasa_client.InsertAlbum(album.title, 'Imported from Facebook via FB2Google', access = self.request.POST.get('album_%s_visibility' % (album.title), 'private'), timestamp = album.timestamp)
-							album.picasa_id = picasa_album.gphoto_id.text
-						except: # SomeError as Something?
-							albums_with_error.append(album_title) #or a dict with error details? may be including failed photos list?
-							continue
+						logging.debug('Creating album %s in Picasa...', album.title)
+						visibility = self.request.POST.get('album_%s_visibility' % (album.title), 'private')
+						picasa_album = picasa_client.InsertAlbum(album.title, 'Imported from Facebook via FB2Google', access = visibility, timestamp = album.timestamp)
+						album.picasa_id = picasa_album.gphoto_id.text
+						logging.debug('Album %s is created in Picasa with visibility level "%s". Picasa Id: %s', album.title, visibility, album.picasa_id)
 
 					picasa_album_url = '/data/feed/api/user/default/albumid/%s' % album.picasa_id
 
 					photos = get_FB_album_photos(archive, album)
+					logging.debug('Parsed %d photos in album %s. Importing to Picasa...', photos.__len__(), album.title)
 					for photo in photos:
 						self.response.out.write('%s (%s) @ %s<br>Tags: %s<br>' % (photo.caption, photo.path, photo.datetime, ', '.join(photo.tags)))
 						for comment in photo.comments:
@@ -258,11 +262,10 @@ class ProcessPage(Page):
 						#TODO: put image upload code into a try-catch block to handle possible errors
 						try:
 							picasa_photo = picasa_client.InsertPhotoSimple(picasa_album_url, photo.caption, 'Imported from Facebook via FB2Google, original creation date: %s' % photo.datetime, photo_content, 'image/jpeg', photo.tags)
-						except: # SomeError as Something?
-							#TODO: Log the failed photo somewhere.
-							self.response.out.write('<br><strong>Failed!</strong><br>')
+						except GooglePhotosExveption:
+							logging.exception('Uploading of a photo failed. (User: %s, Album: %s, Photo: %s)', self.user, album.title, photo.caption)
 							continue
-
+					logging.debug('Importing of album %s completed.', album.title)
 			else:
 				self.write('No permission for Picasa.')
 
@@ -284,6 +287,7 @@ application = webapp.WSGIApplication(
 )
 
 def main():
+	logging.getLogger().setLevel(logging.DEBUG)
 	run_wsgi_app(application)
 
 if __name__ == "__main__":
