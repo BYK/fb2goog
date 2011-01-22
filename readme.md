@@ -9,8 +9,8 @@ your Google Contacts since Facebook only provides a list of names under the "Fri
 ## Where & How? (Technology, hosting etc.)
 FB2Goog runs on Google App Engine using its Python SDK. It is and will be free as long as it stays in the limits that Google put on its app engine platform. It is
 also open source so you can contribute, fork or complain(wait, what?) anytime you want provided that you know how to code in Python, how to use GitHub and smart enough(!)
-respectively. This also means that we are transparent about what we do(yeah yeah we can fake it but, really, we *are* hones people) so you can upload your data without
+respectively. This also means that we are transparent about what we do(yeah yeah we can fake it but, really, we *are* honest people) so you can upload your data without
 having to worry about 3rd parties etc.
 
 ## Who? (Da braaiinzz)
-FB2Goog idea came from [Berker Peksağ](https://github.com/berkerpeksag) and it is developed by him and his dear friend(yeah this is me, LOL) [Burak Yiğit Kaya](https://github.com/BYK).
+FB2Goog idea came from [Berker Peksağ](https://github.com/berkerpeksag) and it is developed by him and his dear friend(yeah that's me, LOL) [Burak Yiğit Kaya](https://github.com/BYK).
