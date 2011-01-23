@@ -8,12 +8,7 @@ import sys
 import urllib
 import zipfile
 
-from StringIO import StringIO
-
 import gdata.alt.appengine
-import gdata.calendar.service
-import gdata.docs.client
-import gdata.photos.service
 import gdata.service
 
 from google.appengine.api import users
@@ -26,8 +21,8 @@ from google.appengine.ext.webapp.util import run_wsgi_app
 
 import models
 
-from helpers import *
-
+from parsers import *
+from importers import *
 
 sys.setrecursionlimit(10000) # SDK fix
 
@@ -37,17 +32,17 @@ class Page(webapp.RequestHandler):
 		'Picasa': {
 			'scope': 'http://picasaweb.google.com/data/',
 			'purpose': 'Photos',
-			'client': gdata.photos.service.PhotosService
+			'importer': PicasaImporter
 		},
 		'Calendar': {
 			'scope': 'http://www.google.com/calendar/feeds/',
 			'purpose': 'Events',
-			'client': gdata.calendar.service.CalendarService
+			#'client': gdata.calendar.service.CalendarService
 		},
 		'Docs': {
 			'scope': 'http://docs.google.com/feeds/',
 			'purpose': 'Notes',
-			'client': gdata.docs.client.DocsClient
+			#'client': gdata.docs.client.DocsClient
 		}
 	}
 
@@ -199,10 +194,10 @@ class ProcessPage(Page):
 			template_values = {}
 			archive_files = archive.namelist()
 
-			#TODO: Wrap the functionality below in a class and use it in the Page.services for automatic and flexible service support
+			#TODO: Use the general "importer" pattern for the work below
 			if 'Picasa' in self.get_user_services():
 				template_values['Picasa'] = {}
-				picasa_client = self.services['Picasa']['client'](email = self.user.email()) #email should be given or InsertAlbum fails
+				picasa_client = gdata.photos.service.PhotosService(email = self.user.email()) #email should be given or InsertAlbum fails
 				gdata.alt.appengine.run_on_appengine(picasa_client)
 
 				picasa_albums = picasa_client.GetUserFeed(user = self.user).entry
@@ -228,46 +223,14 @@ class ProcessPage(Page):
 		if archive:
 			archive_files = archive.namelist()
 
-			if 'Picasa' in self.get_user_services():
-				logging.debug('Getting Picasa client for user %s', self.user)
-				picasa_client = self.services['Picasa']['client'](email = self.user.email()) #email should be given or InsertAlbum fails
-				gdata.alt.appengine.run_on_appengine(picasa_client)
-				logging.debug('Picasa client for user %s initialized.', self.user)
-
-				albums_enabled = self.request.POST.getall('albums_enabled')
-				albums = get_FB_albums(archive)
-				logging.info('Parsed %d albums for user %s.', albums.__len__(), self.user)
-				for album_title in albums_enabled:
-					album = albums[album_title]
-					album.picasa_id = self.request.POST.get('album_%s_picasa_id' % (album.title), None)
-					self.response.out.write('%s (%s) @ %s %s<br>' % (album.title, album.path, album.datetime, album.timestamp))
-
-					if not album.picasa_id:
-						logging.debug('Creating album %s in Picasa...', album.title)
-						visibility = self.request.POST.get('album_%s_visibility' % (album.title), 'private')
-						picasa_album = picasa_client.InsertAlbum(album.title, 'Imported from Facebook via FB2Google', access = visibility, timestamp = album.timestamp)
-						album.picasa_id = picasa_album.gphoto_id.text
-						logging.debug('Album %s is created in Picasa with visibility level "%s". Picasa Id: %s', album.title, visibility, album.picasa_id)
-
-					picasa_album_url = '/data/feed/api/user/default/albumid/%s' % album.picasa_id
-
-					photos = get_FB_album_photos(archive, album)
-					logging.debug('Parsed %d photos in album %s. Importing to Picasa...', photos.__len__(), album.title)
-					for photo in photos:
-						self.response.out.write('%s (%s) @ %s<br>Tags: %s<br>' % (photo.caption, photo.path, photo.datetime, ', '.join(photo.tags)))
-						for comment in photo.comments:
-							self.response.out.write('%s: %s @ %s<br>' % (comment.author, comment.message, comment.datetime))
-
-						photo_content = StringIO(archive.read(photo.path))
-						#TODO: put image upload code into a try-catch block to handle possible errors
-						try:
-							picasa_photo = picasa_client.InsertPhotoSimple(picasa_album_url, photo.caption, 'Imported from Facebook via FB2Google, original creation date: %s' % photo.datetime, photo_content, 'image/jpeg', photo.tags)
-						except GooglePhotosException:
-							logging.exception('Uploading of a photo failed. (User: %s, Album: %s, Photo: %s)', self.user, album.title, photo.caption)
-							continue
-					logging.debug('Importing of album %s completed.', album.title)
-			else:
-				self.write('No permission for Picasa.')
+			for service in self.get_user_services():
+				self.response.out.write('Importing to service %s...' % (service))
+				importer = self.services[service]['importer'](self.user, archive, self.request.POST)
+				import_result = importer.do_import()
+				if import_result == 0:
+					self.response.out.write('%s import completed successfully.' % (service))
+				else:
+					self.response.out.write('%s import completed with errors. (code %d)' % (service, import_result))
 
 			archive.close()
 		else:
