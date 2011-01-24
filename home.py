@@ -32,6 +32,7 @@ class Page(webapp.RequestHandler):
 		'Picasa': {
 			'scope': 'http://picasaweb.google.com/data/',
 			'purpose': 'Photos',
+			'settings': PicasaSettingsProvider,
 			'importer': PicasaImporter
 		},
 		'Calendar': {
@@ -194,28 +195,12 @@ class ProcessPage(Page):
 			template_values = {}
 			archive_files = archive.namelist()
 
-			#TODO: Use the general "importer" pattern for the work below
-			if 'Picasa' in self.get_user_services():
-				template_values['Picasa'] = {}
-				picasa_client = gdata.photos.service.PhotosService(email = self.user.email()) #email should be given or InsertAlbum fails
-				gdata.alt.appengine.run_on_appengine(picasa_client)
-
-				picasa_albums = picasa_client.GetUserFeed(user = self.user).entry
-				albums = get_FB_albums(archive).values()
-				for album in albums:
-					picasa_album_id = None
-					for picasa_album_id in (picasa_album.gphoto_id.text for picasa_album in picasa_albums if picasa_album.title.text == album.title):
-						break
-					album.picasa_id = picasa_album_id
-
-					#TODO: Prepare template and output variable for visibility and override preferences("albums" already proper?)
-					template_values['Picasa']['albums'] = albums
-					#self.response.out.write('%s (%s) @ %s %s - on picasa: %s<br>' % (album.title, album.path, album.datetime, album.timestamp, album.picasa_id))
+			for service in self.get_user_services():
+				settings_provider = self.services[service]['settings'](self.user, archive)
+				template_values[service] = settings_provider.template_vars
 
 			archive.close()
 			self.render('process', template_values)
-		else:
-			self.redirect('/upload')
 
 	def post(self): #TODO: Separate this part for "task" section
 		logging.info('Import request received for user %s', self.user)
