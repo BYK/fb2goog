@@ -79,10 +79,7 @@ class FBPhoto(object):
 
 				break
 
-		self.comments = []
-		for comment_container in container.getElementsByTagName('div'):
-			if comment_container.getAttribute('class') == 'comment':
-				self.comments.append(FBComment(comment_container))
+		self.comments = map(FBComment, (comment_container for comment_container in container.getElementsByTagName('div') if comment_container.getAttribute('class') == 'comment')
 
 
 class FBComment(object):
