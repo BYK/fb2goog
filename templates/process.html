@@ -3,35 +3,35 @@
 {% block content %}
 <h2>Importing Settings</h2>
 <form enctype="multipart/form-data" method="POST" action="/process">
-	{% if Picasa %}
-	<fieldset id="Picasa">
-		<h3>Your albums on Facebook</h3>
-		<ul>
-			{% for album in Picasa.albums %}
-			<li>
-				<input type="checkbox" name="albums_enabled" id="album_{{ album.title }}" value="{{ album.title }}" checked>
-				<label for="album_{{ album.title }}"><strong>{{ album.title }}</strong></label>
-				{% if album.picasa_id %}
-				<br>
-				<input type="checkbox" name="album_{{ album.title }}_picasa_id" id="album_{{ album.title }}_picasa_id" value="{{ album.picasa_id }}">
-				<label for="album_{{ album.title }}_picasa_id">Use existing album on Picasa</label>
-				{% endif %}
-				<ul id="album_{{ album.title }}_details">
-					<li>Date: <em>{{ album.datetime }}</em></li>
-					<li>
-						<label for="album_{{ album.title }}_visibility">Visibility: </label>
-						<select name="album_{{ album.title }}_visibility" id="album_{{ album.title }}_visibility">
-							<option value="private" selected>Anyone with link</option>
-							<option value="public">Public</option>
-							<option value="protected">Private</option>
-						</select>
-					</li>
-				</ul>
-			</li>
-			{% endfor %}
-		</ul>
-	</fieldset>
-	{% endif %}
-	<button type="submit">Import</button>
+    {% if Picasa %}
+    <fieldset id="Picasa">
+        <h3>Your albums on Facebook</h3>
+        <ul>
+            {% for album in Picasa.albums %}
+            <li>
+                <input type="checkbox" name="albums_enabled" id="album_{{ album.title }}" value="{{ album.title }}" checked>
+                <label for="album_{{ album.title }}"><strong>{{ album.title }}</strong></label>
+                {% if album.picasa_id %}
+                <br>
+                <input type="checkbox" name="album_{{ album.title }}_picasa_id" id="album_{{ album.title }}_picasa_id" value="{{ album.picasa_id }}">
+                <label for="album_{{ album.title }}_picasa_id">Use existing album on Picasa</label>
+                {% endif %}
+                <ul id="album_{{ album.title }}_details">
+                    <li>Date: <em>{{ album.datetime }}</em></li>
+                    <li>
+                        <label for="album_{{ album.title }}_visibility">Visibility: </label>
+                        <select name="album_{{ album.title }}_visibility" id="album_{{ album.title }}_visibility">
+                            <option value="private" selected>Anyone with link</option>
+                            <option value="public">Public</option>
+                            <option value="protected">Private</option>
+                        </select>
+                    </li>
+                </ul>
+            </li>
+            {% endfor %}
+        </ul>
+    </fieldset>
+    {% endif %}
+    <button type="submit">Import</button>
 </form>
 {% endblock %}

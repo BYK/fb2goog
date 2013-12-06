@@ -3,7 +3,7 @@
 body,div,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,acronym,address,big,cite,code,del,dfn,em,img,ins,kbd,q,s,samp,small,strike,strong,sub,sup,tt,var,dd,ol,ul,li,fieldset,form,label,legend,caption{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent;}ol,ul{list-style:none;}blockquote:before,blockquote:after,q:before,q:after{content:'';}:focus{outline:0;}ins{text-decoration:none;}del{text-decoration:line-through;}table{border-collapse:collapse;border-spacing:0;}
 
 .clear:after {
-	content: ""; display: block; height: 0; clear: both; visibility: hidden;
+    content: ""; display: block; height: 0; clear: both; visibility: hidden;
 }
 
 body {
@@ -36,7 +36,7 @@ body {
         #content h2 {
             background-color: #ebeff9; font: normal 28px arial, sans-serif; padding: 7px 20px;
         }
-                
+
 
     footer {
         color: #666; display: block; font-size: 11px; padding: 15px 20px;
