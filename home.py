@@ -13,7 +13,6 @@ import gdata.service
 
 from google.appengine.api import users
 from google.appengine.ext import blobstore
-from google.appengine.ext import db
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import blobstore_handlers
 from google.appengine.ext.webapp import template
@@ -21,10 +20,10 @@ from google.appengine.ext.webapp.util import run_wsgi_app
 
 import models
 
-from parsers import *
+from parsers import *  # NOQA
 from importers import *
 
-sys.setrecursionlimit(10000) # SDK fix
+sys.setrecursionlimit(10000)  # SDK fix
 
 
 class Page(webapp.RequestHandler):
