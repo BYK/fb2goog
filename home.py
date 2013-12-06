@@ -1,11 +1,7 @@
 # coding: utf-8
 
-import logging
 import os
-import posixpath
-import re
 import sys
-import urllib
 import zipfile
 
 import gdata.alt.appengine
@@ -20,7 +16,6 @@ from google.appengine.ext.webapp.util import run_wsgi_app
 
 import models
 
-from parsers import *  # NOQA
 from importers import *
 
 sys.setrecursionlimit(10000)  # SDK fix
