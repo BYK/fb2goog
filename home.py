@@ -42,15 +42,15 @@ class Page(webapp.RequestHandler):
     }
 
     def __init__(self):
-        self.user = users.get_current_user()
+        super(Page, self).__init__()
 
+        self.user = users.get_current_user()
         if self.user:
             self.url = users.create_logout_url('/')
             self.is_logged = True
         else:
             self.url = users.create_login_url('/services')
             self.is_logged = False
-
         self.values = {
             'user': self.user,
             'url': self.url,
