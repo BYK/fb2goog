@@ -75,11 +75,17 @@ class Page(webapp.RequestHandler):
 
         blob_key = user_info.blob_key
         archive_blob = blobstore.BlobReader(blob_key)
-        return zipfile.ZipFile(archive_blob, 'r') if archive_blob else None #returned file should be manually "closed", might be dangerous
 
-    def render(self, file, values = {}):
+        # returned file should be manually "closed", might be dangerous
+        return zipfile.ZipFile(archive_blob, 'r') if archive_blob else None
+
+    def render(self, file_name, values=None):
+        if values is None:
+            values = {}
+
         values.update(self.values)
-        path = posixpath.join(posixpath.dirname(__file__), 'templates/%s.html' % file)
+        path = posixpath.join(posixpath.dirname(__file__),
+                              'templates/%s.html' % file_name)
         self.response.out.write(template.render(path, values))
 
     def write(self, string):
@@ -89,8 +95,12 @@ class Page(webapp.RequestHandler):
 class MainPage(Page):
     def get(self):
         if self.is_logged:
-            #TODO: Create a case block here for proper redirects: upload if blobstore is empty, services if no services activated, process if everything is OK
-            #TODO: redirection to upload page should be a separate routine due to special "create_upload_url" system
+            # TODO: Create a case block here for proper redirects: upload if
+            #       blob store is empty, services if no services activated,
+            #       process if everything is OK
+            # TODO: redirection to upload page should be a separate routine due
+            #       to special "create_upload_url" system
+
             upload_url = blobstore.create_upload_url('/upload')
             self.render('upload', {'upload_url': upload_url})
         else:
@@ -133,7 +143,9 @@ class ServicesPage(Page):
 
         if scopes:
             user_info.put()
-            self.redirect(gdata_client.GenerateAuthSubURL(save_token_url, scopes, secure = False, session = True).to_string())
+            self.redirect(gdata_client.GenerateAuthSubURL(
+                save_token_url, scopes, secure=False, session=True).to_string()
+            )
         else:
             self.redirect('/services')
 
@@ -143,11 +155,11 @@ class TokenPage(Page):
         gdata_client = gdata.service.GDataService()
         gdata.alt.appengine.run_on_appengine(gdata_client)
 
-        auth_token = gdata.auth.extract_auth_sub_token_from_url(self.request.uri)
-        if not auth_token:
+        token = gdata.auth.extract_auth_sub_token_from_url(self.request.uri)
+        if not token:
             self.redirect('/services')
 
-        session_token = gdata_client.upgrade_to_session_token(auth_token)
+        session_token = gdata_client.upgrade_to_session_token(token)
         if not session_token:
             self.redirect('/services')
 
@@ -177,7 +189,7 @@ class UploadPage(blobstore_handlers.BlobstoreUploadHandler, Page):
             self.redirect('/')
 
 
-class SavedPage(Page): #Unnecesary?
+class SavedPage(Page):  # Unnecessary?
     def get(self):
         self.render('saved')
 
@@ -187,29 +199,35 @@ class ProcessPage(Page):
         archive = self.get_user_archive()
         if archive:
             template_values = {}
-            archive_files = archive.namelist()
 
             for service in self.get_user_services():
-                settings_provider = self.services[service]['settings'](self.user, archive)
+                settings_provider = self.services[service]['settings'](
+                    self.user, archive
+                )
                 template_values[service] = settings_provider.template_vars
 
             archive.close()
             self.render('process', template_values)
 
-    def post(self): #TODO: Separate this part for "task" section
+    def post(self):  # TODO: Separate this part for "task" section
         logging.info('Import request received for user %s', self.user)
         archive = self.get_user_archive()
         if archive:
-            archive_files = archive.namelist()
-
             for service in self.get_user_services():
-                self.response.out.write('Importing to service %s...' % (service))
-                importer = self.services[service]['importer'](self.user, archive, self.request.POST)
+                self.response.out.write('Importing to service %s...' % service)
+                importer = self.services[service]['importer'](
+                    self.user, archive, self.request.POST
+                )
                 import_result = importer.do_import()
                 if import_result == 0:
-                    self.response.out.write('%s import completed successfully.' % (service))
+                    self.response.out.write(
+                        '%s import completed successfully.' % service
+                    )
                 else:
-                    self.response.out.write('%s import completed with errors. (code %d)' % (service, import_result))
+                    self.response.out.write(
+                        '%s import completed with errors. (code %d)' %
+                        (service, import_result)
+                    )
 
             archive.close()
         else:
@@ -225,8 +243,9 @@ application = webapp.WSGIApplication(
         ('/token', TokenPage),
         ('/saved', SavedPage),
     ],
-    debug = True
+    debug=True
 )
+
 
 def main():
     logging.getLogger().setLevel(logging.DEBUG)
